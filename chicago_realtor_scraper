@@ -1,0 +1,102 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue May 31 09:51:18 2022
+
+@author: LukeCathcart
+"""
+
+from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
+import time
+from selenium.webdriver.support.select import Select
+from time import sleep
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver import ActionChains
+import wget
+import urllib.request
+from bs4 import BeautifulSoup as bs
+import requests
+import re
+import pandas as pd
+
+#Pull up the website
+driver=webdriver.Chrome(executable_path = '/Users/lukecathcart/Downloads/chromedriver')
+driver.get('https://chicagorealtor.com/realtor-search/?listpage=779') 
+driver.maximize_window()
+time.sleep(1)
+wait = WebDriverWait(driver, 10)
+
+#Create empty lists (sometimes this can be easier than dealing with a dict later)
+realtor = []
+company = []
+full_address = []
+address1 = []
+address2 = []
+phone = []
+email = []
+not_none = 0
+none = 0
+
+#Create a loop to go through the pages on the website
+while True:
+    page_links = []
+    substring = '/agent/'
+    soup = driver.page_source
+    page_soup = bs(soup, 'html.parser')
+    all_links = page_soup.findAll('a')
+
+    for link in all_links:
+        page_link = link.get('href')
+        if substring in page_link:
+            page_links.append(page_link)
+
+    for agent in page_links:
+        #Open each realtor link in a new window
+        driver.execute_script("window.open('"+'https://chicagorealtor.com'+str(agent)+"');")
+        driver.switch_to.window(driver.window_handles[1])
+        #Pull data
+        new_soup = driver.page_source
+        agent_soup = bs(new_soup, 'html.parser')
+        agent_data = agent_soup.find('table', id = 'realtor-info')
+        if agent_data is not None:
+            agent_rows = agent_data.findAll("tr")
+            realtor_data = [[td.findChildren(text=True) for td in tr.findAll("td")] for tr in agent_rows]
+            realtor.append(realtor_data[0][1])
+            company.append(realtor_data[1][1])
+            full_address.append(realtor_data[2][1])
+            phone.append(realtor_data[3][1])
+            email.append(realtor_data[4][1])
+            not_none += 1
+        else:
+            none += 1
+        driver.close()
+        driver.switch_to.window(driver.window_handles[0])
+    
+    #Click the next button until unable
+    try:
+        element = wait.until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, 'Next')))
+        element.click()
+    except (NoSuchElementException,TimeoutException):
+        break
+    
+#Now we have all the data, we need to put it together into our dataframe
+print("Realtors with information:", not_none)
+print("Realtors with no information:", none)
+df = pd.DataFrame({"Name": realtor, "Company": company, "Full Address": full_address, "Phone": phone, "Email": email})
+df.to_csv('/Users/lukecathcart/Downloads/tom_test_data779.csv')   
+    
+    
+
+
+    
+    
+
+
+
+
